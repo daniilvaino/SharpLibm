@@ -31,7 +31,9 @@ musl:          Copyright © 2005-2020 Rich Felker, et al.
 ## The Go Authors — BSD-3-Clause
 
 Used in: `src/SharpLibm/Rounding.cs` (after `math/floor.go`, `math/modf.go`),
-`src/SharpLibm/Remainders.cs` (`remainder`, after `math/remainder.go`).
+`src/SharpLibm/Remainders.cs` (`remainder`, after `math/remainder.go`),
+`src/SharpLibm/Bessel.cs` (after `math/j0.go`, `math/j1.go`, `math/jn.go`),
+`src/SharpLibm/Erfinv.cs` (after `math/erfinv.go`).
 Taken through the C# conversion in go2cs (`src/core/math`).
 
 ```
@@ -103,7 +105,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## Sun Microsystems fdlibm
 
 Used in: `fmod` and `remainder` (`src/SharpLibm/Remainders.cs`), whose
-algorithms are fdlibm's (e_fmod.c, e_remainder.c).
+algorithms are fdlibm's (e_fmod.c, e_remainder.c), and the Bessel functions
+(`src/SharpLibm/Bessel.cs`, e_j0.c, e_j1.c, e_jn.c through FreeBSD msun and Go).
 
 ```
 Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.

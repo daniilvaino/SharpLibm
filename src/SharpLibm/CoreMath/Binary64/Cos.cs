@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace CoreMathSharp;
 
+#pragma warning disable CS0660, CS0661   // SharpLibm: == without Equals(object)/GetHashCode — never boxed or hashed
 internal struct Uint128
 {
     // SharpLibm: was `readonly record struct Uint128(ulong lo, ulong hi)`.
@@ -12,8 +13,6 @@ internal struct Uint128
     public readonly void Deconstruct(out ulong lo, out ulong hi) { lo = this.lo; hi = this.hi; }
     public static bool operator ==(Uint128 a, Uint128 b) => a.lo == b.lo && a.hi == b.hi;
     public static bool operator !=(Uint128 a, Uint128 b) => !(a == b);
-    public override readonly bool Equals(object obj) => obj is Uint128 other && this == other;
-    public override readonly int GetHashCode() => lo.GetHashCode() ^ hi.GetHashCode();
 
     public static Uint128 Zero => new Uint128(0, 0);
     public static Uint128 One => new Uint128(1, 0);
@@ -141,8 +140,6 @@ internal static partial class StrictMath
         public readonly void Deconstruct(out ulong lo, out ulong hi, out long ex, out ulong sgn) { lo = this.lo; hi = this.hi; ex = this.ex; sgn = this.sgn; }
         public static bool operator ==(Dint a, Dint b) => a.lo == b.lo && a.hi == b.hi && a.ex == b.ex && a.sgn == b.sgn;
         public static bool operator !=(Dint a, Dint b) => !(a == b);
-        public override readonly bool Equals(object obj) => obj is Dint other && this == other;
-        public override readonly int GetHashCode() => lo.GetHashCode() ^ hi.GetHashCode() ^ ex.GetHashCode() ^ sgn.GetHashCode();
 
         public static Dint Zero => new Dint(0, 0, -1076, 0);
         public static Dint One => new Dint(0, 0x8000000000000000, 0, 0);

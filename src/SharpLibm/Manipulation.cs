@@ -113,9 +113,6 @@ namespace SharpLibm
             return ilogb(x);
         }
 
-#if SHARPLIBM_EXPORTS
-        [System.Runtime.RuntimeExport("scalbln")]
-#endif
         public static double scalbln(double x, long n)
         {
             ulong bits = Bits.Of(x);
@@ -165,9 +162,6 @@ namespace SharpLibm
         }
 
         // nexttoward takes a long double in C; long double is double here.
-#if SHARPLIBM_EXPORTS
-        [System.Runtime.RuntimeExport("nexttoward")]
-#endif
         public static double nexttoward(double x, double y) => nextafter(x, y);
 
         // ---- float ----
@@ -259,9 +253,6 @@ namespace SharpLibm
             return ilogbf(x);
         }
 
-#if SHARPLIBM_EXPORTS
-        [System.Runtime.RuntimeExport("scalblnf")]
-#endif
         public static float scalblnf(float x, long n)
         {
             uint bits = Bits.Of(x);
@@ -308,9 +299,6 @@ namespace SharpLibm
             return Bits.Single(bits);
         }
 
-#if SHARPLIBM_EXPORTS
-        [System.Runtime.RuntimeExport("nexttowardf")]
-#endif
         public static float nexttowardf(float x, double y)
         {
             if (Bits.IsNaN(x) || Bits.IsNaN(y)) return (float)(x + y);

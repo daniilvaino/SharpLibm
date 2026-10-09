@@ -112,41 +112,39 @@ internal static partial class StrictMathF
 
 
 
-        // https://git.musl-libc.org/cgit/musl/tree/src/math/fmaf.c
+        // SharpLibm fix: musl's fmaf (the port's Fallback) catches a double-
+        // rounding tie by testing the bits that float precision drops — which
+        // is too few bits when the result is a float subnormal, so 23 of
+        // TestFloat's 6.1 M f32_mulAdd level-1 cases came out one ulp off.
+        // Round to odd instead: x·y is exact in double (24 + 24 bits), the sum
+        // with z is r plus an exact error (TwoSum); when the error is not zero,
+        // r's last bit is forced to 1 toward the exact value. Rounding that to
+        // float is then correct at any float precision, subnormal included,
+        // because double carries at least two more bits (Boldo–Melquiond).
         static float Fallback(float x, float y, float z)
         {
-            double xy, result;
-            int e;
+            double xy = (double)x * y;
+            double r = xy + z;
 
-            xy = (double)x * y;
-            result = xy + z;
-
-            ulong u = Polyfill.DoubleToUInt64Bits(result);
-            e = (int)(u >> 52) & 0x7ff;
-
-            if ((u & 0x1fffffff) != 0x10000000 || e == 0x7ff || (result - xy == z && result - z == xy))
+            ulong u = Polyfill.DoubleToUInt64Bits(r);
+            if ((u & 0x7ff0000000000000ul) == 0x7ff0000000000000ul)
             {
-                return (float)result;
+                return (float)r;                        // ±inf, NaN
             }
 
-            double err;
-            int neg = (int)(u >> 63);
-            if (neg == (z > xy ? 1 : 0))
+            double bz = r - xy;
+            double err = (xy - (r - bz)) + (z - bz);
+            if (err != 0 && (u & 1) == 0)
             {
-                err = xy - result + z;
-            }
-            else
-            {
-                err = z - result + xy;
-            }
-
-            if (neg == (err < 0 ? 1 : 0))
-            {
-                u++;
-            }
-            else
-            {
-                u--;
+                // Toward the exact value: up in magnitude when err has r's sign.
+                if ((err > 0) == (r > 0))
+                {
+                    u++;
+                }
+                else
+                {
+                    u--;
+                }
             }
 
             return (float)Polyfill.UInt64BitsToDouble(u);

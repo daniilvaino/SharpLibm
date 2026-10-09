@@ -11,6 +11,7 @@ namespace CoreMathSharp;
 
 internal static partial class StrictMath
 {
+#pragma warning disable CS0660, CS0661   // SharpLibm: == without Equals(object)/GetHashCode — never boxed or hashed
     private struct Qint
     {
         // SharpLibm: was `readonly record struct Qint(ulong ll, ulong lh, ulong hl, ulong hh, long ex, ulong sgn)`.
@@ -24,8 +25,6 @@ internal static partial class StrictMath
         public readonly void Deconstruct(out ulong ll, out ulong lh, out ulong hl, out ulong hh, out long ex, out ulong sgn) { ll = this.ll; lh = this.lh; hl = this.hl; hh = this.hh; ex = this.ex; sgn = this.sgn; }
         public static bool operator ==(Qint a, Qint b) => a.ll == b.ll && a.lh == b.lh && a.hl == b.hl && a.hh == b.hh && a.ex == b.ex && a.sgn == b.sgn;
         public static bool operator !=(Qint a, Qint b) => !(a == b);
-        public override readonly bool Equals(object obj) => obj is Qint other && this == other;
-        public override readonly int GetHashCode() => ll.GetHashCode() ^ lh.GetHashCode() ^ hl.GetHashCode() ^ hh.GetHashCode() ^ ex.GetHashCode() ^ sgn.GetHashCode();
 
         public readonly Uint128 rl => new Uint128(ll, lh);
         public readonly Uint128 rh => new Uint128(hl, hh);
@@ -1865,7 +1864,7 @@ internal static partial class StrictMath
 
         if (_x >= 0x7ff0000000000000 || _y >= 0x7ff0000000000000)
         {
-            if (double.IsNaN(x))
+            if (SharpLibm.Bits.IsNaN(x))   // SharpLibm: not double.IsNaN — outside the host contract
             {
                 if (y == 0.0 && !isSignaling(x))
                 {
@@ -1875,7 +1874,7 @@ internal static partial class StrictMath
                 return x + x;
             }
 
-            if (double.IsNaN(y))
+            if (SharpLibm.Bits.IsNaN(y))   // SharpLibm: not double.IsNaN — outside the host contract
             {
                 if (x == 1.0 && !isSignaling(y))
                 {
@@ -2181,7 +2180,7 @@ internal static partial class StrictMath
             }
 
             // SharpLibm: message without the operands (interpolating doubles needs host formatting).
-            throw new InvalidOperationException("Unexpected worst-case found in pow (CORE-MATH accurate path).");
+            return SharpLibm.Libm.Unreachable("Unexpected worst-case found in pow (CORE-MATH accurate path).");
         }
     }
 }

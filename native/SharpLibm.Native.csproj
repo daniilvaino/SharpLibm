@@ -1,0 +1,206 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SharpLibm as a C library: NativeAOT NoStdLib, no .NET runtime, every
+       function exported under its C name ([RuntimeExport]). The assembly is its
+       own system module: MinimalRuntime.cs, LdTokenHelpers.cs and
+       ../std-no-runtime-sharplibm/ hold the core types the compiler and ILC
+       need. Built natively, for the host, from SharpLibm's root:
+
+         dotnet publish native -c Release
+
+       Windows  ->  native/bin/Release/net8.0/win-x64/publish/sharplibm.dll
+                    (MSVC link.exe: Visual Studio or Build Tools with the C++
+                    workload, vswhere on PATH — a Developer Command Prompt)
+       Linux    ->  native/bin/Release/net8.0/linux-x64/publish/sharplibm.so
+                    (the system's clang, as the SDK uses it) -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">linux-x64</RuntimeIdentifier>
+    <OutputType>Library</OutputType>
+    <NativeLib>Shared</NativeLib>
+    <AssemblyName>sharplibm</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+    <PublishAot>true</PublishAot>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+    <IlcSystemModule>sharplibm</IlcSystemModule>
+    <!-- DebuggerSupport exports a runtime debug header no one defines here;
+         IlcDehydrate relies on the SDK bootstrapper to rehydrate data, which
+         is left out below. -->
+    <DebuggerSupport>false</DebuggerSupport>
+    <IlcDehydrate>false</IlcDehydrate>
+    <SharpLibmExports>true</SharpLibmExports>
+    <SharpLibmNoExceptions>true</SharpLibmNoExceptions>
+    <!-- C's long is 32-bit on Windows (CAbiExports.cs). -->
+    <DefineConstants Condition="$(RuntimeIdentifier.StartsWith('win'))">$(DefineConstants);SHARPLIBM_CLONG32</DefineConstants>
+    <!-- The ILCompiler and its runtime pack, pinned (as SharpOS pins them,
+         toolchain.json): unpinned, the SDK takes the newest net8 patch it
+         knows, and the output would depend on the installed SDK. -->
+    <SharpLibmIlcVersion Condition="'$(SharpLibmIlcVersion)' == ''">8.0.27</SharpLibmIlcVersion>
+    <RuntimeFrameworkVersion>$(SharpLibmIlcVersion)</RuntimeFrameworkVersion>
+    <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
+  </PropertyGroup>
+
+  <Import Project="..\SharpLibm.props" />
+
+  <ItemGroup>
+    <Compile Include="..\std-no-runtime-sharplibm\**\*.cs" Link="std\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="MinimalRuntime.cs" />
+    <Compile Include="LdTokenHelpers.cs" />
+  </ItemGroup>
+
+  <Target Name="SharpLibmPinIlCompiler" BeforeTargets="ProcessFrameworkReferences">
+    <ItemGroup>
+      <KnownILCompilerPack Condition="'%(KnownILCompilerPack.Identity)' == 'Microsoft.DotNet.ILCompiler' AND '%(KnownILCompilerPack.TargetFramework)' == 'net8.0'">
+        <ILCompilerPackVersion>$(SharpLibmIlcVersion)</ILCompilerPackVersion>
+      </KnownILCompilerPack>
+    </ItemGroup>
+  </Target>
+
+  <!-- No reference assemblies: this assembly is the core library. -->
+  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
+    <ItemGroup>
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" />
+      <ReferencePath Remove="@(ReferencePath)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RemoveHostConfigurationOptions" BeforeTargets="WriteIlcRspFileForCompilation" DependsOnTargets="PrepareForILLink">
+    <ItemGroup>
+      <RuntimeHostConfigurationOption Remove="@(RuntimeHostConfigurationOption)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The library carries no runtime and calls nothing: drop the SDK's
+       NativeAOT runtime, its DLL bootstrapper and the Win32 import libraries,
+       and link with no default libraries and no entry point. -->
+  <Target Name="ExcludeNativeAotRuntime" AfterTargets="SetupOSSpecificProps" BeforeTargets="LinkNative"
+          Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <ItemGroup>
+      <NativeLibrary Remove="$(IlcSdkPath)Runtime.WorkstationGC$(LibrarySuffix)" />
+      <LinkerArg Remove="&quot;$(IlcSdkPath)Runtime.WorkstationGC$(LibrarySuffix)&quot;" />
+      <NativeLibrary Remove="$(IlcSdkPath)Runtime.VxsortEnabled$(LibrarySuffix)" />
+      <LinkerArg Remove="&quot;$(IlcSdkPath)Runtime.VxsortEnabled$(LibrarySuffix)&quot;" />
+      <NativeLibrary Remove="$(IlcSdkPath)bootstrapperdll$(ObjectSuffix)" />
+      <LinkerArg Remove="&quot;$(IlcSdkPath)bootstrapperdll$(ObjectSuffix)&quot;" />
+      <LinkerArg Remove="@(SdkNativeLibrary->'&quot;%(Identity)&quot;')" />
+      <LinkerArg Remove="/DEFAULTLIB:ucrt.lib" />
+      <LinkerArg Include="/NODEFAULTLIB" />
+      <LinkerArg Include="/NOENTRY" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Linux (-r linux-x64, built on Linux): the same for clang's link line —
+       out go the NativeAOT runtime and bootstrapper, the framework's native
+       libraries and libc/libm/pthread; in goes -nostdlib. -->
+  <Target Name="ExcludeNativeAotRuntimeUnix" AfterTargets="SetupOSSpecificProps" BeforeTargets="LinkNative"
+          Condition="!$(RuntimeIdentifier.StartsWith('win'))">
+    <ItemGroup>
+      <_SharpLibmDrop Include="@(LinkerArg)"
+                      Condition="$([System.String]::Copy('%(Identity)').Contains('/sdk/lib')) OR $([System.String]::Copy('%(Identity)').Contains('/framework/lib')) OR $([System.String]::Copy('%(Identity)').StartsWith('-l')) OR '%(Identity)' == '-pthread'" />
+      <LinkerArg Remove="@(_SharpLibmDrop)" />
+      <LinkerArg Include="-nostdlib" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The C interface, from SharpLibm's sources: every [RuntimeExport("name")]
+       and the method signature under it. One parse gives both the export
+       list and sharplibm.h, so the two cannot disagree. C# types map to C:
+       double, float, int, void as they are; long (64-bit) to long long; CLong
+       (CAbiExports.cs) to long; T* to T *. Any other type is a build error. -->
+  <UsingTask TaskName="SharpLibmCInterface" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Sources ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <Header ParameterType="System.String" Required="true" />
+      <Names ParameterType="System.String[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var rx = new Regex(@"\[System\.Runtime\.RuntimeExport\(""(\w+)""\)\]\s*(?:#endif\s*)?(?:\[[^\]]*\]\s*)*(?:(?:public|internal|private|static|unsafe)\s+)+([\w\*]+)\s+\w+\s*\(([^)]*)\)");
+        var types = new Dictionary<string, string> {
+          { "double", "double" }, { "float", "float" }, { "int", "int" }, { "void", "void" },
+          { "long", "long long" }, { "CLong", "long" },
+          { "double*", "double *" }, { "float*", "float *" }, { "int*", "int *" },
+        };
+        Func<string, string> c = t => {
+          string r;
+          if (!types.TryGetValue(t, out r)) throw new Exception("sharplibm.h: no C type for C# '" + t + "'");
+          return r;
+        };
+        var decls = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var item in Sources)
+          foreach (Match m in rx.Matches(File.ReadAllText(item.ItemSpec)))
+          {
+            string name = m.Groups[1].Value, ret = c(m.Groups[2].Value);
+            var ps = m.Groups[3].Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                       .Select(p => p.Trim().Split(' ')).Select(p => c(p[0]) + (c(p[0]).EndsWith("*") ? "" : " ") + p[1]);
+            string args = string.Join(", ", ps);
+            decls[name] = ret + (ret.EndsWith("*") ? "" : " ") + name + "(" + (args.Length == 0 ? "void" : args) + ");";
+          }
+        var h = new StringBuilder();
+        h.AppendLine("/* sharplibm.h - the C interface of SharpLibm (sharplibm.dll / sharplibm.so).");
+        h.AppendLine("   Generated from SharpLibm's sources at build time; do not edit.");
+        h.AppendLine("   C names and C semantics, round-to-nearest, no errno and no exception flags.");
+        h.AppendLine("   nexttoward/nexttowardf are not exported: use nextafter (long double differs");
+        h.AppendLine("   between toolchains). Extensions to ISO C: rsqrt, compoundf (real exponent),");
+        h.AppendLine("   erfinv, erfcinv, j0/j1/jn/y0/y1/yn float forms, lgamma*_r, sincos*. */");
+        h.AppendLine("#ifndef SHARPLIBM_H");
+        h.AppendLine("#define SHARPLIBM_H");
+        h.AppendLine();
+        h.AppendLine("#ifdef __cplusplus");
+        h.AppendLine("extern \"C\" {");
+        h.AppendLine("#endif");
+        h.AppendLine();
+        foreach (var d in decls.Values) h.AppendLine(d);
+        h.AppendLine();
+        h.AppendLine("#ifdef __cplusplus");
+        h.AppendLine("}");
+        h.AppendLine("#endif");
+        h.AppendLine();
+        h.AppendLine("#endif /* SHARPLIBM_H */");
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(Header)));
+        File.WriteAllText(Header, h.ToString().Replace("\r\n", "\n"));
+        Names = decls.Keys.ToArray();
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!-- Exports written over the exports file ILC produced (it lists only
+       UnmanagedCallersOnly entry points, none here). The SDK hands
+       $(ExportsFile) to the linker itself: /DEF: for PE, a version script for
+       ELF. sharplibm.h goes next to the library in the publish directory. -->
+  <Target Name="WriteExportsDef" BeforeTargets="LinkNative">
+    <ItemGroup>
+      <_SharpLibmSource Include="..\src\SharpLibm\**\*.cs" />
+    </ItemGroup>
+    <SharpLibmCInterface Sources="@(_SharpLibmSource)" Header="$(IntermediateOutputPath)sharplibm.h">
+      <Output TaskParameter="Names" ItemName="_SharpLibmExportName" />
+    </SharpLibmCInterface>
+    <WriteLinesToFile Condition="$(RuntimeIdentifier.StartsWith('win'))" File="$(ExportsFile)"
+                      Lines="LIBRARY sharplibm;EXPORTS;@(_SharpLibmExportName)" Overwrite="true" />
+    <WriteLinesToFile Condition="!$(RuntimeIdentifier.StartsWith('win'))" File="$(ExportsFile)"
+                      Lines="{ global:;@(_SharpLibmExportName->'%(Identity)%3B');local: *%3B }%3B" Overwrite="true" />
+  </Target>
+
+  <Target Name="PublishHeader" AfterTargets="Publish">
+    <Copy SourceFiles="$(IntermediateOutputPath)sharplibm.h" DestinationFolder="$(PublishDir)" />
+  </Target>
+
+</Project>

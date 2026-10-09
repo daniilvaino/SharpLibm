@@ -6,6 +6,7 @@ namespace CoreMathSharp;
 internal static partial class StrictMath
 {
 
+#pragma warning disable CS0660, CS0661   // SharpLibm: == without Equals(object)/GetHashCode — never boxed or hashed
     private struct Tint
     {
         // SharpLibm: was `readonly record struct Tint(ulong m, ulong h, ulong l, long ex, ulong sgn)`.
@@ -18,8 +19,6 @@ internal static partial class StrictMath
         public readonly void Deconstruct(out ulong m, out ulong h, out ulong l, out long ex, out ulong sgn) { m = this.m; h = this.h; l = this.l; ex = this.ex; sgn = this.sgn; }
         public static bool operator ==(Tint a, Tint b) => a.m == b.m && a.h == b.h && a.l == b.l && a.ex == b.ex && a.sgn == b.sgn;
         public static bool operator !=(Tint a, Tint b) => !(a == b);
-        public override readonly bool Equals(object obj) => obj is Tint other && this == other;
-        public override readonly int GetHashCode() => m.GetHashCode() ^ h.GetHashCode() ^ l.GetHashCode() ^ ex.GetHashCode() ^ sgn.GetHashCode();
 
         public static Tint Zero => new Tint(0, 0, 0, -1076, 0);
         public static Tint One => new Tint(0, 0x8000000000000000ul, 0, 1, 0);
@@ -400,7 +399,7 @@ internal static partial class StrictMath
                     (~mm == 0 && (low == 0x3ff || low == 0x7ff) && ~ll < err))
                 {
                     // SharpLibm: message without the operands (interpolating doubles needs host formatting).
-                    throw new InvalidOperationException("Unexpected worst-case found in atan2 (CORE-MATH accurate path).");
+                    SharpLibm.Libm.Unreachable("Unexpected worst-case found in atan2 (CORE-MATH accurate path).");
                 }
             }
             if (eex <= -1022)

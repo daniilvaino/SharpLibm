@@ -121,7 +121,10 @@ internal static partial class StrictMathF
         }
 
 
-        static (float sin, float cos) asSinCosFDatabase(float x)
+        // SharpLibm fix: C's as_sincosf_database only overwrites results already
+        // stored by its caller; the port returned (NaN, NaN) for x not in the
+        // table (126 finite inputs). It now returns the caller's (s, c).
+        static (float sin, float cos) asSinCosFDatabase(float x, float s, float c)
         {
             ReadOnlySpan<float> st = [9830.3984375f, -0.34761324524879456f, -7.4505805969238281e-09f, -0.93763798475265503f, -1.4901161193847656e-08f, 0.72992426156997681f, 0.6668131947517395f, -1.4901161193847656e-08f, 0.74522489309310913f, 1.4901161193847656e-08f, 1.3086903095245361f, 0.96584641933441162f, -1.4901161193847656e-08f, 0.25911521911621094f, -7.4505805969238281e-09f, 9.4247779846191406f, -2.384975950064927e-08f, -4.4408920985006262e-16f, -1f, 2.9802322387695312e-08f, 4.7123889923095703f, -1f, 2.9802322387695312e-08f, 1.1924880638503055e-08f, -2.2204460492503131e-16f, 2861650809978880f, -0.84553730487823486f, 1.4901161193847656e-08f, 0.5339164137840271f, -1.4901161193847656e-08f, 23127222067920896f, 0.87241017818450928f, 1.4901161193847656e-08f, 0.48877441883087158f, 7.4505805969238281e-09f, 1.100467763087514e+19f, 0.08465760201215744f, -9.3132257461547852e-10f, 0.996410071849823f, 1.4901161193847656e-08f, 1.7269983397793917e+20f, -0.24683333933353424f, 3.7252902984619141e-09f, 0.96905797719955444f, -1.4901161193847656e-08f];
 
@@ -139,7 +142,7 @@ internal static partial class StrictMathF
                 }
             }
 
-            return (float.NaN, float.NaN);
+            return (s, c);
         }
 
 
@@ -176,7 +179,7 @@ internal static partial class StrictMathF
             ulong tail = (tr + 6) & (~0ul >> 36);
             if (tail <= 12)
             {
-                return asSinCosFDatabase(x);
+                return asSinCosFDatabase(x, (float)s, (float)c);
             }
 
             return ((float)s, (float)c);
@@ -220,7 +223,7 @@ internal static partial class StrictMathF
 
             if (ax == 0x812d97c8u)
             {
-                return asSinCosFDatabase(x);
+                return asSinCosFDatabase(x, float.NaN, float.NaN);   // x is in the table
             }
             (z, ia) = rltl0(z0);
         }
@@ -232,7 +235,7 @@ internal static partial class StrictMathF
             }
             if (ax == 0x8c333330u)
             {
-                return asSinCosFDatabase(x);
+                return asSinCosFDatabase(x, float.NaN, float.NaN);   // x is in the table
             }
             (z, ia) = rltl((float)z0);
         }

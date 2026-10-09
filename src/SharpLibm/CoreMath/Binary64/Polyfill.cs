@@ -1,8 +1,8 @@
 using System;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 
 #if COREMATHSHARP_NETCOREAPP3_0_OR_GREATER
+using System.Numerics;      // SharpLibm: only the BitOperations branches use it; a NoStdLib host need not have it
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;

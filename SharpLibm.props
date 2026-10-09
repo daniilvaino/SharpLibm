@@ -20,6 +20,10 @@
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants Condition="'$(SharpLibmExports)' == 'true'">$(DefineConstants);SHARPLIBM_EXPORTS</DefineConstants>
+    <!-- SharpLibmNoExceptions=true: CORE-MATH's "unexpected worst case" guards
+         end the process instead of throwing (Unreachable.cs) — for a host with
+         no exception types, such as the NoStdLib C library (native/). -->
+    <DefineConstants Condition="'$(SharpLibmNoExceptions)' == 'true'">$(DefineConstants);SHARPLIBM_NO_EXCEPTIONS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

@@ -9,8 +9,9 @@
 // to nearest (ECMA-335 I.12.1.3) and raises no floating-point exceptions, so
 // both are roundeven here.
 //
-// floor, ceil, trunc, rint, nearbyint, modf and their float forms are
-// replaceable (out of line): SSE4.1 does each in one roundsd/roundss.
+// floor, ceil, trunc, rint, nearbyint and their float forms are replaceable
+// (out of line): SSE4.1 does each in one roundsd/roundss. modf goes through
+// the trunc entry, so it is accelerated with it.
 
 using System.Runtime.CompilerServices;
 
@@ -144,31 +145,12 @@ namespace SharpLibm
 #if SHARPLIBM_EXPORTS
         [System.Runtime.RuntimeExport("modf")]
 #endif
-        [MethodImpl(MethodImplOptions.NoInlining)]
         public static double modf(double x, double* iptr)
         {
-            ulong u = Bits.Of(x);
-            int e = Bits.Exponent(u) - Bits.DoubleBias;
-            if (e >= Bits.DoubleMantissaBits)
-            {
-                *iptr = x;
-                if (Bits.IsNaN(x)) return x;
-                return Bits.Double(u & Bits.DoubleSignMask);    // ±inf and large integers: fraction ±0
-            }
-            if (e < 0)
-            {
-                *iptr = Bits.Double(u & Bits.DoubleSignMask);
-                return x;
-            }
-            ulong m = Bits.DoubleMantissaMask >> e;
-            if ((u & m) == 0)
-            {
-                *iptr = x;
-                return Bits.Double(u & Bits.DoubleSignMask);
-            }
-            double i = Bits.Double(u & ~m);
+            double i = trunc(x);            // the replaceable entry: one roundsd with SSE4.1
             *iptr = i;
-            return x - i;
+            if (x == i) return Bits.Double(Bits.Of(x) & Bits.DoubleSignMask);   // integral, ±inf: fraction ±0
+            return x - i;                   // exact; NaN stays NaN
         }
 
         // ---- float ----
@@ -290,30 +272,11 @@ namespace SharpLibm
 #if SHARPLIBM_EXPORTS
         [System.Runtime.RuntimeExport("modff")]
 #endif
-        [MethodImpl(MethodImplOptions.NoInlining)]
         public static float modff(float x, float* iptr)
         {
-            uint u = Bits.Of(x);
-            int e = Bits.Exponent(u) - Bits.SingleBias;
-            if (e >= Bits.SingleMantissaBits)
-            {
-                *iptr = x;
-                if (Bits.IsNaN(x)) return x;
-                return Bits.Single(u & Bits.SingleSignMask);
-            }
-            if (e < 0)
-            {
-                *iptr = Bits.Single(u & Bits.SingleSignMask);
-                return x;
-            }
-            uint m = Bits.SingleMantissaMask >> e;
-            if ((u & m) == 0)
-            {
-                *iptr = x;
-                return Bits.Single(u & Bits.SingleSignMask);
-            }
-            float i = Bits.Single(u & ~m);
+            float i = truncf(x);            // the replaceable entry: one roundss with SSE4.1
             *iptr = i;
+            if (x == i) return Bits.Single(Bits.Of(x) & Bits.SingleSignMask);
             return x - i;
         }
 
@@ -345,7 +308,8 @@ namespace SharpLibm
         public static long llroundf(float x) => ToInt64(roundf(x));
 
         // C's long is 32-bit on Windows, 64-bit elsewhere; these follow the
-        // 64-bit (LP64) definition.
+        // 64-bit (LP64) definition. The C exports are in CAbiExports.cs, sized
+        // to the target's long.
         public static long lrint(double x) => llrint(x);
         public static long lround(double x) => llround(x);
         public static long lrintf(float x) => llrintf(x);

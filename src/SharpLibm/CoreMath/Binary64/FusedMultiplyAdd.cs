@@ -282,12 +282,22 @@ internal static partial class StrictMath
         }
 
 
+        // SharpLibm: double.IsNormal / IsFinite through the bits — they are
+        // not in SharpLibm's host contract (a NoStdLib CoreLib need not have them).
+        static bool IsNormalBits(double v)
+        {
+            ulong e = (SharpLibm.Bits.Of(v) >> 52) & 0x7ff;
+            return e != 0 && e != 0x7ff;
+        }
+
+        static bool IsFiniteBits(double v) => ((SharpLibm.Bits.Of(v) >> 52) & 0x7ff) != 0x7ff;
+
         static double FastEmulation(double x, double y, double z)
         {
             double xl, xh, sl, sh, vl, vh;
             (xh, xl) = dekkerProd(x, y);
 
-            if (!double.IsNormal(xh))
+            if (!IsNormalBits(xh))
             {
                 return double.NaN;
             }
@@ -295,14 +305,14 @@ internal static partial class StrictMath
             (sh, sl) = twoSum(xh, z);
             (vh, vl) = twoSum(xl, sl);
 
-            if (!double.IsNormal(vh))
+            if (!IsNormalBits(vh))
             {
                 return double.NaN;
             }
 
-            if (!double.IsFinite(sh) || !double.IsFinite(xl))
+            if (!IsFiniteBits(sh) || !IsFiniteBits(xl))
             {
-                if (double.IsFinite(x) && double.IsFinite(y) && !double.IsFinite(z))
+                if (IsFiniteBits(x) && IsFiniteBits(y) && !IsFiniteBits(z))
                 {
                     return z;
                 }
@@ -324,7 +334,7 @@ internal static partial class StrictMath
 
 
         double fastPath = FastEmulation(x, y, z);
-        if (!double.IsNaN(fastPath))
+        if (!SharpLibm.Bits.IsNaN(fastPath))   // SharpLibm: not double.IsNaN — outside the host contract
         {
             return fastPath;
         }

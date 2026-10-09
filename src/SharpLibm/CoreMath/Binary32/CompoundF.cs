@@ -507,7 +507,7 @@ internal static partial class StrictMathF
                 if (left != right)
                 {
                     // SharpLibm: message without the operands (interpolating floats needs host formatting).
-                    throw new InvalidOperationException("Rounding test of the accurate path failed in compoundf (CORE-MATH).");
+                    SharpLibm.Libm.Unreachable("Rounding test of the accurate path failed in compoundf (CORE-MATH).");
                 }
             }
 

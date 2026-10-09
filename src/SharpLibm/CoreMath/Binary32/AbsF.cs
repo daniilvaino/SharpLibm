@@ -1,0 +1,21 @@
+#if COREMATHSHARP_NETCOREAPP3_0_OR_GREATER
+using System.Runtime.Intrinsics;
+#endif
+
+namespace CoreMathSharp;
+
+internal static partial class StrictMathF
+{
+    /// <inheritdoc cref="StrictMath.Abs(double)"/>
+    public static float Abs(float x)
+    {
+#if COREMATHSHARP_NETCOREAPP3_0_OR_GREATER
+        if (Vector128.IsHardwareAccelerated)
+        {
+            return Vector128.BitwiseAnd(Vector128.CreateScalarUnsafe(x), Vector128.CreateScalarUnsafe(Polyfill.UInt32BitsToSingle(~(1u << 31)))).ToScalar();
+        }
+#endif
+
+        return Polyfill.UInt32BitsToSingle(Polyfill.SingleToUInt32Bits(x) & ~(1u << 31));
+    }
+}

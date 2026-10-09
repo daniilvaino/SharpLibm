@@ -1,0 +1,24 @@
+#if COREMATHSHARP_NETCOREAPP3_0_OR_GREATER
+using System.Runtime.Intrinsics;
+#endif
+
+namespace CoreMathSharp;
+
+internal static partial class StrictMath
+{
+    /// <summary>
+    /// Computes the absolute of a value.
+    /// </summary>
+    /// <returns>[0, ∞]</returns>
+    public static double Abs(double x)
+    {
+#if COREMATHSHARP_NETCOREAPP3_0_OR_GREATER
+        if (Vector128.IsHardwareAccelerated)
+        {
+            return Vector128.BitwiseAnd(Vector128.CreateScalarUnsafe(x), Vector128.CreateScalarUnsafe(Polyfill.UInt64BitsToDouble(~(1ul << 63)))).ToScalar();
+        }
+#endif
+
+        return Polyfill.UInt64BitsToDouble(Polyfill.DoubleToUInt64Bits(x) & ~(1ul << 63));
+    }
+}

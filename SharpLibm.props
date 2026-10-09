@@ -1,0 +1,34 @@
+<Project>
+
+  <!-- SharpLibm as a compile-in module: the sources become part of the
+       consuming assembly (a NativeAOT NoStdLib system module, or an ordinary
+       .NET project). No package, no separate assembly: in a NoStdLib image the
+       app is its own system module and a compiled library would have no
+       CoreLib to bind against.
+
+       What the host must provide is listed in README.md ("Host contract").
+
+       SharpLibmDefineRuntimeExport=true compiles a stand-in
+       System.Runtime.RuntimeExportAttribute, for hosts whose CoreLib has none
+       (an ordinary .NET project, e.g. the tests). A NativeAOT NoStdLib host
+       declares its own, because ILC recognises it there. -->
+
+  <!-- SharpLibmExports=true exports every function under its C name
+       ([RuntimeExport("sin")] …), for a host that links C code against it.
+       Off by default: an exported method is a root, so ILC would keep every
+       function and its tables in the image whether called or not. -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants Condition="'$(SharpLibmExports)' == 'true'">$(DefineConstants);SHARPLIBM_EXPORTS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)src\SharpLibm\**\*.cs"
+             Exclude="$(MSBuildThisFileDirectory)src\SharpLibm\Host\**"
+             Link="SharpLibm\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(MSBuildThisFileDirectory)src\SharpLibm\Host\RuntimeExportAttribute.cs"
+             Condition="'$(SharpLibmDefineRuntimeExport)' == 'true'"
+             Link="SharpLibm\Host\RuntimeExportAttribute.cs" />
+  </ItemGroup>
+
+</Project>
